@@ -1,0 +1,82 @@
+' ============================================================
+' ISTRUZIONI:
+' 1. Nel file Excel di destinazione apri il VBA Editor (ALT+F11)
+' 2. Inserisci un nuovo modulo standard
+' 3. Nelle Proprieta (F4) rinominalo da Modulo1 a ImportMod
+' 4. Incolla tutto il codice qui sotto
+' 5. Avvia la macro ImportaTuttiIModuli
+' ============================================================
+
+Sub ImportaTuttiIModuli()
+
+    Dim VBProj As Object
+    Dim VBComp As Object
+    Dim percorso As String
+    Dim file As String
+    Dim nome As String
+    Dim daRimuovere As Collection
+
+    Set VBProj = ThisWorkbook.VBProject
+    percorso = ThisWorkbook.Path & "\ExportVBA\"
+
+    If Dir(percorso, vbDirectory) = "" Then
+        MsgBox "Cartella ExportVBA non trovata!", vbCritical
+        Exit Sub
+    End If
+
+    ' 1. Raccoglie i moduli standard da rimuovere (tutti tranne ImportMod e ModuloMainframe)
+    Set daRimuovere = New Collection
+    For Each VBComp In VBProj.VBComponents
+        If VBComp.Type = 1 And VBComp.Name <> "ImportMod" And VBComp.Name <> "ModuloMainframe" Then
+            daRimuovere.Add VBComp
+        End If
+    Next VBComp
+
+    ' 2. Li rimuove
+    Dim item As Object
+    For Each item In daRimuovere
+        VBProj.VBComponents.Remove item
+    Next item
+
+    ' 3. Importa tutto
+    file = Dir(percorso & "*.*")
+    Do While file <> ""
+
+        Select Case LCase(Right(file, 4))
+
+            Case ".bas"
+                VBProj.VBComponents.Import percorso & file
+
+            Case ".frm"
+                nome = Left(file, InStrRev(file, ".") - 1)
+                If EsisteComponente(VBProj, nome) Then
+                    VBProj.VBComponents.Remove VBProj.VBComponents(nome)
+                End If
+                VBProj.VBComponents.Import percorso & file
+
+            Case ".cls"
+                nome = Left(file, InStrRev(file, ".") - 1)
+                If EsisteComponente(VBProj, nome) Then
+                    With VBProj.VBComponents(nome).CodeModule
+                        .DeleteLines 1, .CountOfLines
+                        .AddFromFile percorso & file
+                    With
+                End If
+
+        End Select
+
+        file = Dir
+    Loop
+
+    ' 4. Si autodistrugge
+    VBProj.VBComponents.Remove VBProj.VBComponents("ImportMod")
+
+    MsgBox "Importazione completata.", vbInformation
+
+End Sub
+
+Function EsisteComponente(VBProj As Object, nome As String) As Boolean
+    On Error Resume Next
+    EsisteComponente = Not VBProj.VBComponents(nome) Is Nothing
+    On Error GoTo 0
+End Function
